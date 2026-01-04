@@ -1,0 +1,304 @@
+---
+title: "Statistics Undergrad Canine Research"
+author: "Reece Carmody"
+date: "2024-05-16"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readxl)
+library(irr)
+library(tidyverse)
+library(dplyr)
+library(emmeans)
+library(ggplot2)
+library(confintr)
+library(conover.test)
+library(rstatix)
+library(rlang)
+library(ggpubr)
+```
+
+
+```{r}
+
+data = read_excel("C:/Users/reece/OneDrive/Desktop/Spring2024/STAT Undergrad Research/ResearchDataset.xlsx", na = "n/a")
+
+```
+
+```{r}
+
+# ICC VALUES
+
+var_names = colnames(data)[-(1:8)] # Get the column names (excluding first 8)
+n = length(var_names) # Get the number of columns (excluding first 8)
+
+icc_matrix = matrix(0, 31, 6)
+
+var_data = data[-c(1, 3, 4, 5, 6, 7, 8)] # Create a data frame with Observer and the numeric columns
+var_data = as.data.frame(var_data)
+
+
+for (i in 2:32) {
+  
+  var_data[,i] = as.numeric(var_data[,i])
+  
+  obs1 = var_data[var_data$Observer == 1, i] # Get obs from both observers
+  obs2 = var_data[var_data$Observer == 2, i]
+  
+  icc_i = icc(data.frame(obs1, obs2)) # Get icc value for column i
+  
+  icc_matrix[i-1, 1] = icc_i$value # Assign icc values to matrix
+  icc_matrix[i-1, 2] = icc_i$lbound
+  icc_matrix[i-1, 3] = icc_i$ubound
+  
+  cor_i = ci_cor(data.frame(obs1, obs2)) # Get correlation value for column i
+  
+  icc_matrix[i-1, 4] = cor_i$estimate # Assign correlation values to matrix
+  icc_matrix[i-1, 5] = cor_i$interval[1]
+  icc_matrix[i-1, 6] = cor_i$interval[2]
+  
+}
+
+rownames(icc_matrix) = var_names
+colnames(icc_matrix) = c("ICC Value", "ICC Lower", "ICC Upper", "Correlation", "COR Lower", "COR Upper")
+
+icc_matrix
+
+```
+
+```{r}
+
+# CONTINUOUS VARIABLES
+
+observer_two = filter(data, Observer == 2) # Only use observer 2 data
+observer_two = data.frame(observer_two)
+
+# Binary cols: 22, 32, 33, 34
+cont_var = observer_two[-c(1:6, 22, 32:34)]
+cont_var_names = colnames(observer_two)[-c(1:6, 22, 32:34)]
+
+# Create matrix for continuous
+
+cont_matrix = matrix(0, 29, 10)
+
+for (i in 1:length(cont_var)) {
+  
+  # Kruskal-wallis test
+  kruskal_result = kruskal.test(cont_var[, i] ~ observer_two$Group, data = observer_two)
+  cont_matrix[i, 1] = kruskal_result$p.value
+  
+  # Getting rid of NA values
+  if (any(is.na(cont_var[, i]))) {
+    na_rows = which(is.na(cont_var[, i]))
+    cont_var_clean = cont_var[-na_rows, i]
+    observer_clean = observer_two[-na_rows, ]
+    cont_var_clean = as.numeric(cont_var_clean)
+  } else {
+    cont_var_clean = cont_var[, i]
+    observer_clean = observer_two
+    cont_var_clean = as.numeric(cont_var_clean)
+  }
+  
+  # cont_var_clean is the column i without NAs
+  # observer_clean is the data (with groups) without NA rows for column i
+
+  # Conover test (pairwise)
+  conover_result = conover.test(cont_var_clean, observer_clean$Group, method = "none")
+  cont_matrix[i, 2] = conover_result$P[1] * 2 # Old CCD, and old non-CCD
+  cont_matrix[i, 3] = conover_result$P[2] * 2 # Old CCD, and young non-CCD
+  cont_matrix[i, 4] = conover_result$P[3] * 2 # Old non-CCD, and young non-CCD
+  
+  # Difference in means
+  cont_matrix[i, 5] = mean(cont_var_clean[observer_clean$Group == "Old, CCD"]) - mean(cont_var_clean[observer_clean$Group == "old, non-CCD"])
+  
+  cont_matrix[i, 6] = mean(cont_var_clean[observer_clean$Group == "Old, CCD"]) - mean(cont_var_clean[observer_clean$Group == "Young non-ccd"])
+  
+  cont_matrix[i, 7] = mean(cont_var_clean[observer_clean$Group == "old, non-CCD"]) - mean(cont_var_clean[observer_clean$Group == "Young non-ccd"])
+  
+  # Difference in medians
+  cont_matrix[i, 8] = median(cont_var_clean[observer_clean$Group == "Old, CCD"]) - median(cont_var_clean[observer_clean$Group == "old, non-CCD"])
+  
+  cont_matrix[i, 9] = median(cont_var_clean[observer_clean$Group == "Old, CCD"]) - median(cont_var_clean[observer_clean$Group == "Young non-ccd"])
+  
+  cont_matrix[i, 10] = median(cont_var_clean[observer_clean$Group == "old, non-CCD"]) - median(cont_var_clean[observer_clean$Group == "Young non-ccd"])
+  
+}
+
+rownames(cont_matrix) = cont_var_names
+colnames(cont_matrix) = c("Kruskal-Wallis", "Con, Old CCD & Old non-CCD", "Con, Old CCD & Young non-CCD", "Con, Old non-CCD & Young non-CCD", "Mean, Old CCD - Old non-CCD", "Mean, Old CCD - Young non-CCD", "Mean, Old non-CCD - Young non-CCD", "Median, Old CCD - Old non-CCD", "Median, Old CCD - Young non-CCD", "Median, Old non-CCD - Young non-CCD")
+
+```
+
+```{r}
+
+# CONTINUOUS VARIABLE GRAPHS
+
+for (i in 1:length(cont_var)) {
+
+  test = subset(observer_two, !is.na(cont_var[, i]))
+  test = test[-c(22, 32:34)]
+  
+  test[, i+6] = as.numeric(test[, i+6])
+  
+  stat.test = tibble::tribble(
+    ~group1, ~group2, ~p.adj,
+    "old, non-CCD", "Old, CCD", signif(cont_matrix[i, 2], digits = 3),
+    "Young non-ccd", "Old, CCD", signif(cont_matrix[i, 3], digits = 3),
+    "Young non-ccd", "old, non-CCD", signif(cont_matrix[i, 4], digits = 3)
+  )
+
+  label_overall = paste0("Kruskal-Wallis, p = ", signif(cont_matrix[i, 1], digits = 3))
+  
+  y_pos = max(test[, i+6], na.rm = TRUE) + 0.1 * diff(range(test[, i+6], na.rm = TRUE))
+  y_pos2 = max(test[, i+6], na.rm = TRUE) + 0.8 * diff(range(test[, i+6], na.rm = TRUE))
+  
+  boxplot = ggboxplot(test, x = "Group", y = cont_var_names[i]) +
+    stat_pvalue_manual(
+      stat.test,
+      y.position = y_pos,
+      step.increase = 0.1,
+      label = "p.adj") +
+    annotate("text", x = "old, non-CCD",
+             y = y_pos2,
+             label = label_overall)
+  
+print(boxplot)
+
+}
+
+```
+
+```{r}
+
+# Extra barplots for the count variable columns (last 4)
+
+count_var = observer_two[, c(36:39)]
+count_var_names = colnames(observer_two)[c(36:39)]
+
+for (i in 1:length(count_var)) {
+
+  test = subset(observer_two, !is.na(count_var[, i]))
+  test = test[c(1:6, 36:39)]
+  
+  test[, i+6] = as.numeric(test[, i+6])
+  
+  stat.test = tibble::tribble(
+    ~group1, ~group2, ~p.adj,
+    "old, non-CCD", "Old, CCD", signif(cont_matrix[i, 2], digits = 3),
+    "Young non-ccd", "Old, CCD", signif(cont_matrix[i, 3], digits = 3),
+    "Young non-ccd", "old, non-CCD", signif(cont_matrix[i, 4], digits = 3)
+  )
+
+  label_overall = paste0("Kruskal-Wallis, p = ", signif(cont_matrix[i, 1], digits = 3))
+  
+  y_pos = mean(test[, i+6], na.rm = TRUE) + 1.5 * mean(test[, i+6], na.rm = TRUE)
+  y_pos2 = mean(test[, i+6], na.rm = TRUE) + 3.0 * mean(test[, i+6], na.rm = TRUE)
+  
+  barplot = ggbarplot(test, x = "Group", y = count_var_names[i], add = "mean") +
+    stat_pvalue_manual(
+      stat.test,
+      y.position = y_pos,
+      step.increase = 0.1,
+      label = "p.adj") +
+    annotate("text", x = "old, non-CCD",
+             y = y_pos2,
+             label = label_overall)
+  
+print(barplot)
+
+} 
+
+```
+  
+
+```{r}
+
+# BINARY VARIABLES
+# None of these columns having missing values
+
+bin_var = observer_two[, c(22, 32:34)]
+bin_var_names = colnames(observer_two)[c(22, 32:34)]
+
+# Create the matrix for binary columns
+
+bin_matrix = matrix(0, 4, 7)
+
+for (i in 1:length(bin_var)) {
+  
+  # Get number of 0's and 1's in column i
+  bin_col_counts = observer_two %>%
+    group_by(Group) %>%
+    summarize(Num1 = sum(!!sym(bin_var_names[i])),
+              Num0 = sum(1 - !!sym(bin_var_names[i])))
+  
+  temp_bin_matrix = as.matrix(bin_col_counts[, 2:3])
+  rownames(temp_bin_matrix) = as.vector(as.matrix(bin_col_counts[, 1]))
+  
+  # Fisher test
+  bin_matrix[i, 1] = fisher_test(temp_bin_matrix)$p
+  
+  # Pairwise fisher tests
+  bin_matrix[i, 3] = pairwise_fisher_test(temp_bin_matrix, p.adjust.method = "none")$p[1] #old CCD, young non
+  bin_matrix[i, 2] = pairwise_fisher_test(temp_bin_matrix, p.adjust.method = "none")$p[2] #old CCD, old non
+  bin_matrix[i, 4] = pairwise_fisher_test(temp_bin_matrix, p.adjust.method = "none")$p[3] #young non, old non
+  
+  # Pairwise differences in means
+  bin_matrix[i, 5] = mean(bin_var[observer_two$Group == "Old, CCD", i]) -  mean(bin_var[observer_two$Group == "old, non-CCD", i])
+  
+  bin_matrix[i, 6] = mean(bin_var[observer_two$Group == "Old, CCD", i]) -  mean(bin_var[observer_two$Group == "Young non-ccd", i])
+  
+  bin_matrix[i, 7] = mean(bin_var[observer_two$Group == "old, non-CCD", i]) - mean(bin_var[observer_two$Group == "Young non-ccd", i])
+
+}
+
+rownames(bin_matrix) = bin_var_names
+colnames(bin_matrix) = c("Fisher Test", "PW Fisher, Old CCD & Old non-CCD", "PW Fisher, Old CCD & Young non-CCD", "PW Fisher, Old non-CCD & Young non-CCD", "Mean, Old CCD - Old non-CCD", "Mean, Old CCD - Young non-CCD", "Mean, Old non-CCD - Young non-CCD")
+
+```
+
+
+```{r}
+
+# BINARY VARIABLE GRAPHS
+
+for (i in 1:length(bin_var)) {
+
+  test = subset(observer_two, !is.na(bin_var[, i]))
+  test = test[c(1:6, 22, 32:34)]
+  
+  test[, i+6] = as.numeric(test[, i+6])
+  
+  stat.test = tibble::tribble(
+    ~group1, ~group2, ~p.adj,
+    "old, non-CCD", "Old, CCD", signif(bin_matrix[i, 2], digits = 3),
+    "Young non-ccd", "Old, CCD", signif(bin_matrix[i, 3], digits = 3),
+    "Young non-ccd", "old, non-CCD", signif(bin_matrix[i, 4], digits = 3)
+  )
+
+  label_overall = paste0("Fisher's Test, p = ", signif(bin_matrix[i, 1], digits = 3))
+  
+  y_pos = mean(test[, i+6], na.rm = TRUE) + 1.75 * mean(test[, i+6], na.rm = TRUE)
+  y_pos2 = mean(test[, i+6], na.rm = TRUE) + 3.0 * mean(test[, i+6], na.rm = TRUE)
+  
+  barplot = ggbarplot(test, x = "Group", y = bin_var_names[i], add = "mean") +
+    stat_pvalue_manual(
+      stat.test,
+      y.position = y_pos,
+      step.increase = 0.1,
+      label = "p.adj") +
+    annotate("text", x = "old, non-CCD",
+             y = y_pos2,
+             label = label_overall)
+  
+print(barplot)
+
+}
+
+```
+
+
+
