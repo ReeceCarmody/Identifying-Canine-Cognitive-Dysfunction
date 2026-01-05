@@ -1,5 +1,6 @@
 # Identifying Canine Cognitive Dysfunction
-May 2024 - June 2024
+May 2024 - June 2024   
+Written in R
 
 ## Overview
 This undergraduate research project, conducted in collaboration with a graduate student, analyzed veterinary brain data from Colorado State University to identify regions of the brain associated with Canine Cognitive Dysfunction (CCD), a cognitive disease common in older dogs.
