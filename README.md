@@ -47,3 +47,8 @@ A categorical variable that denotes the diagnosis was used for analysis. Dogs we
   - Found that roughly half of the brain measurements show evidence of a difference between non-CCD dogs (both young and old) than compared to older dogs that do show signs of CCD.
   - Listed as a co-author for a publication that is currently under review.
 
+## References
+Some articles and journals were used for personal research throughout the project.
+- “Falls Road Animal Hospital.” Falls Road Animal Hospital | Baltimore Vet, www.fallsroad.com/site/tips-resources-blog-baltimore-vet/2022/04/15/senior-dog-age. Accessed 26 June 2024.
+- Koo, Terry K, and Mae Y Li. “A Guideline of Selecting and Reporting Intraclass Correlation Coefficients for Reliability Research.” Journal of Chiropractic Medicine, U.S. National Library of Medicine, 31 Mar. 2016, www.ncbi.nlm.nih.gov/pmc/articles/PMC4913118/#:~:text=ICC%20Interpretation&text=Under%20such%20conditions%2C%20we%20suggest,than%200.90%20indicate%20excellent%20reliability.
+- PetMD Editorial, and Stephanie Howe. “Dog Dementia: Symptoms, Causes, Treatment and Life Expectancy.” PetMD, 28 Aug. 2022, www.petmd.com/dog/conditions/neurological/dog-dementia.
